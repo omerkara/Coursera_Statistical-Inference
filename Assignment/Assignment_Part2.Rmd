@@ -3,11 +3,11 @@ title: "Statistical Inference Course Project"
 author: "Omer Kara"
 date: "Friday, January 15, 2016"
 output:
+  pdf_document:
+    fig_height: 5
   html_document:
     keep_md: yes
     theme: readable
-  pdf_document:
-    fig_height: 5
 subtitle: 'Part 2: Basic inferential data analysis'
 ---
 Source code for this entire report can be found [here](https://github.com/omerkara/Coursera_Statistical-Inference).
