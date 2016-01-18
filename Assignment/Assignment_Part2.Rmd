@@ -1,0 +1,219 @@
+---
+title: "Statistical Inference Course Project"
+author: "Omer Kara"
+date: "Friday, January 15, 2016"
+output:
+  html_document:
+    keep_md: yes
+    theme: readable
+  pdf_document:
+    fig_height: 5
+subtitle: 'Part 2: Basic inferential data analysis'
+---
+Source code for this entire report can be found [here](https://github.com/omerkara/Coursera_Statistical-Inference).
+
+```{r echo = FALSE, warning = FALSE}
+Load.Install <- function(package_names) {
+    is_installed <- function(mypkg) is.element(mypkg, utils::installed.packages()[ ,1])
+    for (package_name in package_names) {
+        if (!is_installed(package_name)) {
+            utils::install.packages(package_name, dependencies = TRUE)
+        }
+        suppressMessages(library(package_name, character.only = TRUE, quietly = TRUE, verbose = FALSE))
+    }
+}
+Load.Install(c("ggplot2", "datasets", "gridExtra", "knitr"))
+```
+
+## Summary of the Data and Exploratory Analysis
+In the second part of the project, we analyze the `ToothGrowth` data in the R datasets package. The data is set of 60 observations, and the response is the length of odontoblasts (teeth) in each of 10 guinea pigs at each of three dose levels of Vitamin C (0.5, 1, and 2 mg) with each of two delivery methods (orange juice or ascorbic acid). 
+
+```{r, echo = TRUE}
+data <- ToothGrowth
+data$dose <- as.factor(data$dose)
+str(data) ## Summary of data frame.
+rbind(head(data, 5), tail(data, 5)) ## First 5 and last 5 rows of data
+table(data$supp, data$dose) ## Summary of levels of Delivery Methods and Dose.
+summary(data) ## Summary of data.
+```
+
+
+The following four figures shows the tooth length of guniea pigs by supplement type and dose. Note that Figure 1 is by supplement type, Figure 2 is by dose, and Figure 3 and 4 are by supplement and dose type.
+
+
+```{r echo = FALSE}
+s <- ggplot(data = data, aes(x = supp, y = len, fill = supp))
+s <- s + labs(title = "Figure 1") + labs(x = "Supplement Type", y = "Tooth Length")
+s <- s + geom_bar(stat = "identity") + guides(fill = guide_legend(title = "Supplement Type"))
+
+d <- ggplot(data = data, aes(x = dose, y = len, fill = dose))
+d <- d + labs(title = "Figure 2") + labs(x = "Dose in Miligrams", y = "Tooth Length")
+d <- d + geom_bar(stat = "identity") + guides(fill = guide_legend(title = "Dose"))
+
+sd <- ggplot(data = data, aes(x = dose, y = len, fill = supp))
+sd <- sd + labs(title = "Figure 3") + labs(x = "Dose in Miligrams", y = "Tooth Length")
+sd <- sd + geom_bar(stat = "identity") + facet_grid(. ~ supp) + guides(fill = guide_legend(title = "Supplement Type"))
+
+ds <- ggplot(data = data, aes(x = supp, y = len, fill = dose))
+ds <- ds + labs(title = "Figure 4") + labs(x = "Supplement Type", y = "Tooth Length")
+ds <- ds + geom_bar(stat = "identity") + facet_grid(. ~ dose) + guides(fill = guide_legend(title = "Dose"))
+
+grid.arrange(s, d, ds, sd, ncol = 2, nrow = 2, top = "Tooth Length of Guniea Pigs by Supplement Type and Dose")
+```
+
+
+## Confidence Interval and Hypothesis Testing
+In order to understand Vitamin C's affect on tooth growth, we will conduct the following confidence interval testing scenarios:  
+- By supplement type.  
+- By dose.   
+- Dose by aach each supplement type.  
+- Supplement type by each dosage.  
+
+For each of the comparisons, we will subset data frame appropriately and utilize the `t.test` R function to determine each scenarios confidence interval, p-value and hypothesis test results.[1^] As the theory suggests that a formal two tailed hypothesis test with null equal to 0 is equavalent to confidence interval testing, the inference will be given via hypothesis test results.  
+The general results from the tables below are;  
+- Supplement type in general does not affect tooth length.  
+- Dose level in general affects tooth length. It seems that the more vitamin C, the more tooth length.  
+- Does level by each supplement type affects tooth lenght. It seems that the more vitamin C, the more tooth length.  
+- Supplement type in 1 and 0.5 miligrams dose levels affects the tooth length but does not have any effect in 2 miligrams does level.  
+
+
+```{r echo = FALSE}
+# By supplement type.
+supplements <- c("VC", "OJ")
+comparisons <- length(supplements)*(length(supplements) - 1)/2
+temp <- data.frame(Comparison = rep(NA, comparisons), CI.95 = rep(NA, comparisons), P.Value = rep(NA, comparisons), Hypothesis.Test.Result = rep(NA, comparisons), stringsAsFactors = FALSE)
+
+for (i in 1:length(supplements)) {
+    if (i != length(supplements)) {
+        t <- t.test(data[data$supp == supplements[i], ]$len, data[data$supp == supplements[i + 1], ]$len, paired = FALSE, var.equal = FALSE, alternative = "two.sided")
+        temp$Comparison[i] <- paste0("s", supplements[i], ".", "s", supplements[i + 1])
+        temp$CI.95[i] <- paste0("(", round(t$conf.int[1], 4), ", ", round(t$conf.int[2], 4), ")")
+        temp$P.Value[i] <- round(t$p.value, 2)
+        if (round(t$p.value, 2) < 0.05) {
+            temp$Hypothesis.Test.Result[i] <- "Reject Null: Statistically there is a difference."
+        }
+        else {
+            temp$Hypothesis.Test.Result[i] <- "Fail to Reject Null: Statistically there is no difference"
+        }
+    }
+}
+kable(temp, caption = "Comparison of Supplement Type")
+
+
+# By dose.
+levels <- c("2", "1", "0.5")
+comparisons <- length(levels)*(length(levels) - 1)/2
+temp <- data.frame(Comparison = rep(NA, comparisons), CI.95 = rep(NA, comparisons), P.Value = rep(NA, comparisons), Hypothesis.Test.Result = rep(NA, comparisons), stringsAsFactors = FALSE)
+
+for (i in 1:length(levels)) {
+    if (i != length(levels)) {
+        t <- t.test(data[data$dose == levels[i], ]$len, data[data$dose == levels[i + 1], ]$len, paired = FALSE, var.equal = FALSE, alternative = "two.sided")
+        temp$Comparison[i] <- paste0("d", levels[i], ".", "d", levels[i + 1])
+        temp$CI.95[i] <- paste0("(", round(t$conf.int[1], 4), ", ", round(t$conf.int[2], 4), ")")
+        temp$P.Value[i] <- round(t$p.value, 2)
+        if (round(t$p.value, 2) < 0.05) {
+            temp$Hypothesis.Test.Result[i] <- "Reject Null: Statistically there is a difference."
+        }
+        else {
+            temp$Hypothesis.Test.Result[i] <- "Fail to Reject Null: Statistically there is no difference"
+        }
+    }
+    if (i == length(levels)) {
+        t <- t.test(data[data$dose == levels[i - (length(levels) - 1)], ]$len, data[data$dose == levels[i], ]$len, paired = FALSE, var.equal = FALSE, alternative = "two.sided")
+        temp$Comparison[i] <- paste0("d", levels[i - (length(levels) - 1)], ".", "d", levels[i])
+        temp$CI.95[i] <- paste0("(", round(t$conf.int[1], 4), ", ", round(t$conf.int[2], 4), ")")
+        temp$P.Value[i] <- round(t$p.value, 4)
+        if (round(t$p.value, 4) < 0.05) {
+            temp$Hypothesis.Test.Result[i] <- "Reject Null: Statistically there is a difference."
+        }
+        else {
+            temp$Hypothesis.Test.Result[i] <- "Fail to Reject Null: Statistically there is no difference"
+        }
+    }
+}
+kable(temp, caption = "Comparison of Dose")
+
+
+# Dose by each Supplement Type.
+levels <- c("2", "1", "0.5")
+supplements <- c("VC", "OJ")
+comparisons <- length(levels)*(length(levels) - 1)/2
+temp <- data.frame(Supplement.Type = rep(NA, comparisons), Comparison = rep(NA, comparisons), CI.95 = rep(NA, comparisons), P.Value = rep(NA, comparisons), Hypothesis.Test.Result = rep(NA, comparisons), stringsAsFactors = FALSE)
+
+for (j in 1:length(supplements)) {
+    for (i in 1:length(levels)) {
+        if (i != length(levels)) {
+            t <- t.test(data[data$dose == levels[i] & data$supp == supplements[j], ]$len, data[data$dose == levels[i + 1] & data$supp == supplements[j], ]$len, paired = FALSE, var.equal = FALSE, alternative = "two.sided")
+            temp$Supplement.Type[i] <- supplements[j]
+            temp$Comparison[i] <- paste0("d", levels[i], ".", "d", levels[i + 1])
+            temp$CI.95[i] <- paste0("(", round(t$conf.int[1], 4), ", ", round(t$conf.int[2], 4), ")")
+            temp$P.Value[i] <- round(t$p.value, 2)
+            if (round(t$p.value, 2) < 0.05) {
+                temp$Hypothesis.Test.Result[i] <- "Reject Null: Statistically there is a difference."
+            }
+            else {
+                temp$Hypothesis.Test.Result[i] <- "Fail to Reject Null: Statistically there is no difference"
+            }
+        }
+        if (i == length(levels)) {
+            t <- t.test(data[data$dose == levels[i - (length(levels) - 1)] & data$supp == supplements[j], ]$len, data[data$dose == levels[i] & data$supp == supplements[j], ]$len, paired = FALSE, var.equal = FALSE, alternative = "two.sided")
+            temp$Supplement.Type[i] <- supplements[j]
+            temp$Comparison[i] <- paste0("d", levels[i - (length(levels) - 1)], ".", "d", levels[i])
+            temp$CI.95[i] <- paste0("(", round(t$conf.int[1], 4), ", ", round(t$conf.int[2], 4), ")")
+            temp$P.Value[i] <- round(t$p.value, 4)
+            if (round(t$p.value, 4) < 0.05) {
+                temp$Hypothesis.Test.Result[i] <- "Reject Null: Statistically there is a difference."
+            }
+            else {
+                temp$Hypothesis.Test.Result[i] <- "Fail to Reject Null: Statistically there is no difference"
+            }
+        }
+    }
+    if (j == 1) main <- temp
+    else main <- rbind(main, temp)
+}
+
+kable(main, caption = "Comparison of Dose by Each Supplement Type")
+
+
+# Supplement type by each Dose.
+supplements <- c("VC", "OJ")
+levels <- c("2", "1", "0.5")
+comparisons <- length(supplements)*(length(supplements) - 1)/2
+temp <- data.frame(Dose = rep(NA, comparisons), Comparison = rep(NA, comparisons), CI.95 = rep(NA, comparisons), P.Value = rep(NA, comparisons), Hypothesis.Test.Result = rep(NA, comparisons), stringsAsFactors = FALSE)
+
+for (j in 1:length(levels)) {
+    for (i in 1:length(supplements)) {
+        if (i != length(supplements)) {
+            t <- t.test(data[data$supp == supplements[i] & data$dose == levels[j], ]$len, data[data$supp == supplements[i + 1] & data$dose == levels[j], ]$len, paired = FALSE, var.equal = FALSE, alternative = "two.sided")
+            temp$Dose[i] <- paste0("d", levels[j])
+            temp$Comparison[i] <- paste0("s", supplements[i], ".", "s", supplements[i + 1])
+            temp$CI.95[i] <- paste0("(", round(t$conf.int[1], 4), ", ", round(t$conf.int[2], 4), ")")
+            temp$P.Value[i] <- round(t$p.value, 2)
+            if (round(t$p.value, 2) < 0.05) {
+                temp$Hypothesis.Test.Result[i] <- "Reject Null: Statistically there is a difference."
+            }
+            else {
+                temp$Hypothesis.Test.Result[i] <- "Fail to Reject Null: Statistically there is no difference"
+            }
+        }
+    }
+    if (j == 1) main <- temp
+    else main <- rbind(main, temp)
+}
+kable(main, caption = "Comparison of Supplement Type by Each Dose")
+```
+
+### Conclusions
+1. As vitamin c dose increases alone, the tooth length increases as well.
+2. Supplement type in general does not affect tooth growth.
+3. The supplement type with a 0.5 and 1.0 dose size affect the tooth length.
+4. When the dose size reached 2.0 milligrams, there is no difference between supplment types.
+     
+### Assumptions
+1. The samples are independent.
+2. The confidence intervals are assumed to not be paired, i.e. we are not comparing two different supplement types from individual guinea pig.
+3. Since the figures clearly suggest the spread (variance) is not equaly among the supplement type or dosage, unqual variance is assumed in all test.
+3. The distribution is approximately normal.
+
+[^1]: Please note that since the code generating the below tables are pretty long they are omitted here. However, curious readers should check the following [GitHub](https://github.com/omerkara/Coursera_Statistical-Inference) link for `.Rmd` files and more.
